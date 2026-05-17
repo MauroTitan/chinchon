@@ -21,7 +21,18 @@ function getCardTag(cardId) {
 }
 
 function getCloseTag(cardId) {
-    return `<img src="${IMAGE_BASE_URL}cartadecierre.png" class="close-button" onclick="sendChannelMessage('cerrar ${cardId}')" style="cursor:pointer; width:80px; height:auto; margin:2px; vertical-align:middle;" title="Cerrar Juego">`;
+    return `<img src="${IMAGE_BASE_URL}cartadecierre.png" class="chinchon-card close-button" onclick="sendChannelMessage('cerrar ${cardId}')" style="cursor:pointer; width:60px; height:auto; margin:2px; border-radius:5px; vertical-align:middle;" title="Cerrar Juego con la 1ra">`;
+}
+
+function getMesaCardTag(cardId) {
+    const [val, suit] = cardId.split('_');
+    const name = numberMap[val] || val;
+    const fileName = `${name}de${suit}.png`;
+    return `<img src="${IMAGE_BASE_URL}${fileName}" class="chinchon-card" onclick="sendChannelMessage('tomar')" style="cursor:pointer; width:60px; height:auto; margin:2px; border-radius:5px; vertical-align:middle;" title="Tomar ${val} de ${suit}">`;
+}
+
+function getDeckCardTag() {
+    return `<img src="${IMAGE_BASE_URL}cartadecierre.png" class="chinchon-card" onclick="sendChannelMessage('robar')" style="cursor:pointer; width:60px; height:auto; margin:2px; border-radius:5px; vertical-align:middle;" title="Robar del Mazo">`;
 }
 
 // === CHINCHON GAME LOGIC ===
@@ -198,19 +209,20 @@ class ChinchonBot {
     announce(c, showMesa = true) {
         const g = this.getGame(c); const p = g.getCurrentPlayer(); const top = g.discardPile[g.discardPile.length - 1];
         if (showMesa) {
-            this.send(c, `Turno de ${p.nick}<br>${getCardTag(top.id)}<br>Escribe 'tomar' o 'robar'.`);
+            this.send(c, `Turno de ${p.nick}<br><div class="chinchon-deck-container" style="display: flex; gap: 8px; margin-top: 6px; align-items: center;">${getMesaCardTag(top.id)}${getDeckCardTag()}</div>`);
         } else {
-            this.send(c, `Turno de ${p.nick}<br>Escribe 'tomar' o 'robar'.`);
+            this.send(c, `Turno de ${p.nick}`);
         }
     }
     
     hands(c, n = null) {
         const g = this.getGame(c); const players = n ? g.players.filter(p => p.nick === n) : g.players;
         for (const p of players) {
-            let h = "Tus cartas:<br><div class=\"chinchon-cards-container\" style=\"display: flex; flex-flow: row wrap; gap: 4px; margin-top: 6px; align-items: center;\">" + p.hand.map(x => getCardTag(x.id)).join('') + "</div>";
+            let cardsHtml = p.hand.map(x => getCardTag(x.id)).join('');
             if (g.status === 'playing' && g.getCurrentPlayer().nick === p.nick && g.phase === 'discard') {
-                h += `<br>${getCloseTag(p.hand[0].id)} <- Cerrar con la 1ra o tira una.`;
+                cardsHtml += getCloseTag(p.hand[0].id);
             }
+            let h = `Tus cartas:<br><div class="chinchon-cards-container" style="display: flex; flex-flow: row wrap; gap: 4px; margin-top: 6px; align-items: center;">${cardsHtml}</div>`;
             this.notice(p.nick, h);
         }
     }
