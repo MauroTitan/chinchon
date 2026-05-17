@@ -179,7 +179,7 @@ class ChinchonBot {
         } else if (t.startsWith('tirar ')) {
             const r = g.discard(u, t.split(' ')[1]);
             if (typeof r === 'string') this.send(c, r);
-            else { this.send(c, `${u} tiró ${getCardTag(r.id)}`); if (g.status === 'playing') { this.announce(c); this.hands(c); } }
+            else { this.send(c, `${u} tiró ${getCardTag(r.id)}`); if (g.status === 'playing') { this.announce(c, false); this.hands(c); } }
         } else if (t.startsWith('cerrar ')) {
             this.send(c, g.close(u, t.split(' ')[1]));
         } else if (t.includes('@' + BOT_CREDENTIALS.nickname.toLowerCase())) {
@@ -191,9 +191,13 @@ class ChinchonBot {
     send(t, x) { this.ws.send(JSON.stringify({ type: 'message', target: t, text: x })); }
     notice(t, x) { this.ws.send(JSON.stringify({ type: 'notice', target: t, text: x, isPrivate: true })); }
     
-    announce(c) {
+    announce(c, showMesa = true) {
         const g = this.getGame(c); const p = g.getCurrentPlayer(); const top = g.discardPile[g.discardPile.length - 1];
-        this.send(c, `Mesa: ${getCardTag(top.id)}<br>Escribe 'tomar' o 'robar'.`);
+        if (showMesa) {
+            this.send(c, `Turno de ${p.nick}<br>Mesa: ${getCardTag(top.id)}<br>Escribe 'tomar' o 'robar'.`);
+        } else {
+            this.send(c, `Turno de ${p.nick}<br>Escribe 'tomar' o 'robar'.`);
+        }
     }
     
     hands(c, n = null) {
