@@ -199,7 +199,7 @@ class ChinchonBot {
     hands(c, n = null) {
         const g = this.getGame(c); const players = n ? g.players.filter(p => p.nick === n) : g.players;
         for (const p of players) {
-            let h = "Tus cartas: " + p.hand.map(x => getCardTag(x.id)).join(' ');
+            let h = "Tus cartas:<br><div class=\"chinchon-cards-container\" style=\"display: flex; flex-flow: row wrap; gap: 4px; margin-top: 6px; align-items: center;\">" + p.hand.map(x => getCardTag(x.id)).join('') + "</div>";
             if (g.status === 'playing' && g.getCurrentPlayer().nick === p.nick && g.phase === 'discard') {
                 h += `<br>${getCloseTag(p.hand[0].id)} <- Cerrar con la 1ra o tira una.`;
             }
