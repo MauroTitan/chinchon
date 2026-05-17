@@ -222,6 +222,9 @@ class ChinchonBot {
     hands(c, n = null) {
         const g = this.getGame(c); const players = n ? g.players.filter(p => p.nick === n) : g.players;
         for (const p of players) {
+            if (n === null && g.status === 'playing' && g.getCurrentPlayer().nick !== p.nick) {
+                continue;
+            }
             let cardsHtml = p.hand.map(x => getCardTag(x.id)).join('');
             if (g.status === 'playing') {
                 cardsHtml += getCloseTag(p.hand[0].id);
