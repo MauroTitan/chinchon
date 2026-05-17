@@ -7,7 +7,7 @@ const API_HOST = 'websocket-chat-u0fd.onrender.com';
 const BOT_CREDENTIALS = { nickname: 'Party', password: 'Titanparty' };
 const JOIN_TIME_LIMIT = 30000;
 // URL FINAL DE TU GITHUB:
-const IMAGE_BASE_URL = 'https://raw.githubusercontent.com/MauroTitan/juego-dado/main/'; 
+const IMAGE_BASE_URL = 'https://raw.githubusercontent.com/MauroTitan/chinchon/main/cartasespañolas/'; 
 // Si subes las cartas, pon la URL aquí
 
 // === HELPER PARA RENDERIZAR CARTAS ===
