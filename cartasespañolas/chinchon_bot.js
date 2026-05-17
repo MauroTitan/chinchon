@@ -179,7 +179,7 @@ class ChinchonBot {
         } else if (t.startsWith('tirar ')) {
             const r = g.discard(u, t.split(' ')[1]);
             if (typeof r === 'string') this.send(c, r);
-            else { this.send(c, `${u} tiró ${getCardTag(r.id)}`); if (g.status === 'playing') { this.announce(c, false); this.hands(c); } }
+            else { if (g.status === 'playing') { this.announce(c); this.hands(c); } }
         } else if (t.startsWith('cerrar ')) {
             this.send(c, g.close(u, t.split(' ')[1]));
         } else if (t.includes('@' + BOT_CREDENTIALS.nickname.toLowerCase())) {
