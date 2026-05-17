@@ -193,7 +193,7 @@ class ChinchonBot {
     
     announce(c) {
         const g = this.getGame(c); const p = g.getCurrentPlayer(); const top = g.discardPile[g.discardPile.length - 1];
-        this.send(c, `Turno de ${p.nick}<br>Mesa: ${getCardTag(top.id)}<br>Escribe 'tomar' o 'robar'.`);
+        this.send(c, `Mesa: ${getCardTag(top.id)}<br>Escribe 'tomar' o 'robar'.`);
     }
     
     hands(c, n = null) {
