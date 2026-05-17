@@ -194,7 +194,11 @@ class ChinchonBot {
         } else if (t.startsWith('tirar ')) {
             const r = g.discard(u, t.split(' ')[1]);
             if (typeof r === 'string') this.send(c, r);
-            else { if (g.status === 'playing') { this.announce(c); this.hands(c); } }
+            else {
+                const [val, suit] = r.id.split('_');
+                this.send(c, `${u} tiró el ${val} de ${suit}`);
+                if (g.status === 'playing') { this.announce(c); this.hands(c); }
+            }
         } else if (t.startsWith('cerrar ')) {
             this.send(c, g.close(u, t.split(' ')[1]));
         } else if (t.includes('@' + BOT_CREDENTIALS.nickname.toLowerCase())) {
@@ -219,7 +223,7 @@ class ChinchonBot {
         const g = this.getGame(c); const players = n ? g.players.filter(p => p.nick === n) : g.players;
         for (const p of players) {
             let cardsHtml = p.hand.map(x => getCardTag(x.id)).join('');
-            if (g.status === 'playing' && g.getCurrentPlayer().nick === p.nick && g.phase === 'discard') {
+            if (g.status === 'playing') {
                 cardsHtml += getCloseTag(p.hand[0].id);
             }
             let h = `Tus cartas:<br><div class="chinchon-cards-container" style="display: flex; flex-flow: row wrap; gap: 4px; margin-top: 6px; align-items: center;">${cardsHtml}</div>`;
