@@ -80,9 +80,10 @@ class ChinchonGame {
         const p = this.getCurrentPlayer();
         if (!p || p.nick !== n || this.phase !== 'draw') return "No es tu turno.";
         if (this.discardPile.length === 0) return "Mesa vacía.";
-        p.hand.push(this.discardPile.pop());
+        const c = this.discardPile.pop();
+        p.hand.push(c);
         this.phase = 'discard';
-        return true;
+        return c;
     }
 
     discard(n, id) {
@@ -170,11 +171,14 @@ class ChinchonBot {
             if (g.status === 'playing') { this.announce(c); this.hands(c); }
         } else if (t === 'tomar') {
             const r = g.drawFromDiscard(u);
-            if (r === true) { this.send(c, `${u} tomó mesa.`); this.hands(c, u); }
-            else this.send(c, r);
+            if (typeof r === 'object') {
+                const [val, suit] = r.id.split('_');
+                this.send(c, `${u} tomó el ${val} de ${suit}`);
+                this.hands(c, u);
+            } else this.send(c, r);
         } else if (t === 'robar') {
             const r = g.drawFromDeck(u);
-            if (r === true) { this.send(c, `${u} robó.`); this.hands(c, u); }
+            if (r === true) { this.send(c, `${u} robó del mazo.`); this.hands(c, u); }
             else this.send(c, r);
         } else if (t.startsWith('tirar ')) {
             const r = g.discard(u, t.split(' ')[1]);
@@ -194,7 +198,7 @@ class ChinchonBot {
     announce(c, showMesa = true) {
         const g = this.getGame(c); const p = g.getCurrentPlayer(); const top = g.discardPile[g.discardPile.length - 1];
         if (showMesa) {
-            this.send(c, `Turno de ${p.nick}<br>Mesa: ${getCardTag(top.id)}<br>Escribe 'tomar' o 'robar'.`);
+            this.send(c, `Turno de ${p.nick}<br>${getCardTag(top.id)}<br>Escribe 'tomar' o 'robar'.`);
         } else {
             this.send(c, `Turno de ${p.nick}<br>Escribe 'tomar' o 'robar'.`);
         }
