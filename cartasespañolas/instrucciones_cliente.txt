@@ -1,0 +1,35 @@
+// === VERSIÓN FINAL: COPIA ESTO EN TU FUNCIÓN formatUnoCards ===
+
+function formatUnoCards(text) {
+    if (!text) return text;
+    
+    // Mapeo exacto para los nombres de tus archivos .png
+    const numberMap = {
+        1: 'uno', 2: 'dos', 3: 'tres', 4: 'cuatro', 5: 'cinco', 
+        6: 'seis', 7: 'siete', 10: 'diez', 11: 'once', 12: 'doce'
+    };
+
+    // 1. Renderizar cartas de Chinchón
+    // Busca el patrón [CARD:val_palo] y lo convierte en <img src="valdepalo.png">
+    text = text.replace(/\[CARD:(\d+)_([a-z]+)\]/gi, (match, val, suit) => {
+        const name = numberMap[val] || val;
+        const fileName = `${name}de${suit}.png`; // Ejemplo: unodeespada.png
+        const cardId = `${val}_${suit}`;
+        
+        return `<img src="${fileName}" class="chinchon-card" 
+            onclick="sendChannelMessage('tirar ${cardId}')" 
+            style="cursor:pointer; width:65px; height:auto; margin:3px; border-radius:5px; box-shadow: 0 2px 5px rgba(0,0,0,0.3);" 
+            title="Tirar ${val} de ${suit}">`;
+    });
+
+    // 2. Renderizar el botón de Cerrar Juego
+    text = text.replace(/\[CLOSE_BUTTON:(\d+)_([a-z]+)\]/gi, (match, val, suit) => {
+        const cardId = `${val}_${suit}`;
+        return `<img src="cartadecierre.png" class="close-button" 
+            onclick="sendChannelMessage('cerrar ${cardId}')" 
+            style="cursor:pointer; width:90px; height:auto; margin:5px; vertical-align: middle;" 
+            title="Cerrar juego">`;
+    });
+
+    return text;
+}
