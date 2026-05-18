@@ -284,10 +284,7 @@ class ChinchonGame {
     }
 
     endRound(w, ch, c, isChinchon) {
-        const [val, suit] = c.id.split('_');
-        let r = `⚡ **Ronda ${this.roundNumber}**\n\n`;
-        r += `¡Ronda terminada! **${w}** cerró tirando el ${val} de ${SUIT_SYMBOLS[suit] || suit}.\n\n`;
-        r += `**Puntuación de esta ronda:**\n`;
+        let r = `¡Ronda terminada! ${w} cerró.\n`;
         
         // Calcular puntos de esta ronda para todos
         const roundPts = {};
@@ -299,14 +296,11 @@ class ChinchonGame {
             roundPts[p.nick] = pts;
         }
 
-        // Aplicar los puntos al total y mostrar detalle de cartas sobrantes
+        // Aplicar los puntos al total
         for (const p of this.players) {
             const pts = roundPts[p.nick];
             p.points += pts;
-            
-            const partition = getBestPartition(p.hand);
-            const leftoversText = partition.leftovers.map(x => `${x.value}${SUIT_SYMBOLS[x.suit] || x.suit}`).join(', ') || 'Ninguna (0)';
-            r += `• **${p.nick}**: +${pts} pts (Sobrantes: ${leftoversText}) - Total: ${p.points} pts\n`;
+            r += `${p.nick}: +${pts} (Total: ${p.points})\n`;
         }
 
         // Guardar eliminados de esta ronda y registrar
@@ -323,7 +317,7 @@ class ChinchonGame {
 
         // Mensajes de eliminación dramáticos
         for (const p of eliminated) {
-            r += `\n😂 'Hasta Luego' (+70 pts): 💀 **${p.nick}**: ${p.points} puntos\n`;
+            r += `\n😂 'Hasta Luego' (+70 pts): 💀 ${p.nick}: ${p.points} puntos\n`;
         }
 
         // Verificar si termina el juego (si queda <= 1 jugador o si hubo Chinchón)
@@ -356,16 +350,15 @@ class ChinchonGame {
                 return a.points - b.points;
             });
 
-            r += `\n🏆✨ **Ganador** ✨🏆\n`;
+            r += `\n🏆✨ Ganador ✨🏆\n`;
             allEndedPlayers.forEach((p, idx) => {
                 const num = CIRCLE_NUMBERS[idx] || `[${idx + 1}]`;
-                r += `${num} **${p.nick}**: ${p.points} pts (${p.survived ? 'Sobreviviente' : 'Eliminado en Ronda ' + p.round})\n`;
+                r += `${num} ${p.nick}: ${p.points} pts (${p.survived ? 'Sobreviviente' : 'Eliminado en Ronda ' + p.round})\n`;
             });
-            r += `\nEl juego ha terminado. Escriban **!jugar** para iniciar una nueva partida.`;
         } else {
             this.status = 'waiting';
             this.players = remainingPlayers; // Solo quedan los sobrevivientes para la siguiente ronda
-            r += `\nEscriban **!jugar** para iniciar la siguiente ronda.`;
+            r += `\nLa siguiente ronda iniciará automáticamente en 5 segundos...`;
         }
 
         return r;
@@ -441,14 +434,28 @@ class ChinchonBot {
             else this.send(c, r);
         } else if (t.startsWith('tirar ')) {
             const r = g.discard(u, t.split(' ')[1]);
-            if (typeof r === 'string') this.send(c, r);
-            else {
+            if (typeof r === 'string') {
+                this.send(c, r);
+                if (g.status === 'waiting' && g.players.length >= 2) {
+                    setTimeout(() => {
+                        this.send(c, g.start());
+                        if (g.status === 'playing') { this.announce(c); this.hands(c); }
+                    }, 5000);
+                }
+            } else {
                 const [val, suit] = r.id.split('_');
                 this.send(c, `${u} tiró el ${val} de ${suit}`);
                 if (g.status === 'playing') { this.announce(c); this.hands(c); }
             }
         } else if (t.startsWith('cerrar ')) {
-            this.send(c, g.close(u, t.split(' ')[1]));
+            const r = g.close(u, t.split(' ')[1]);
+            this.send(c, r);
+            if (g.status === 'waiting' && g.players.length >= 2) {
+                setTimeout(() => {
+                    this.send(c, g.start());
+                    if (g.status === 'playing') { this.announce(c); this.hands(c); }
+                }, 5000);
+            }
         } else if (t.includes('@' + BOT_CREDENTIALS.nickname.toLowerCase())) {
             this.hands(c, u);
         }
