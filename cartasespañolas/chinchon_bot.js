@@ -217,38 +217,55 @@ class ChinchonGame {
     close(n, id) {
         const p = this.getCurrentPlayer();
         if (!p || p.nick !== n || this.phase !== 'discard') return "No es tu turno.";
-        const i = p.hand.findIndex(c => c.id === id);
-        if (i === -1) return "No tienes esa carta.";
         
-        // Sacar la carta elegida para cerrar
-        const c = p.hand.splice(i, 1)[0];
-        
-        // Obtener la partición de las 7 cartas restantes
-        const partition = getBestPartition(p.hand);
-        const leftoversCount = partition.leftovers.length;
+        // El jugador tiene 8 cartas en su mano actualmente.
+        // Probamos descartar cada una de las 8 cartas para encontrar cuál produce el mejor cierre válido.
+        let bestDiscard = null;
+        let bestPartition = null;
+        let bestScore = Infinity; // Menor score es mejor
 
-        let canClose = false;
-        if (leftoversCount === 0 || leftoversCount === 1) {
-            canClose = true;
-        } else if (leftoversCount === 2) {
-            // Al menos una de las dos debe ser un 1, 2 o 3
-            const values = partition.leftovers.map(x => x.value);
-            if (values.some(v => v === 1 || v === 2 || v === 3)) {
+        for (let idx = 0; idx < p.hand.length; idx++) {
+            const handCopy = [...p.hand];
+            const testDiscard = handCopy.splice(idx, 1)[0];
+            
+            const partition = getBestPartition(handCopy);
+            const leftoversCount = partition.leftovers.length;
+
+            let canClose = false;
+            if (leftoversCount === 0 || leftoversCount === 1) {
                 canClose = true;
+            } else if (leftoversCount === 2) {
+                const values = partition.leftovers.map(x => x.value);
+                if (values.some(v => v === 1 || v === 2 || v === 3)) {
+                    canClose = true;
+                }
+            }
+
+            if (canClose) {
+                const sum = partition.leftovers.reduce((s, c) => s + (c.value >= 10 ? 10 : c.value), 0);
+                const score = leftoversCount * 1000 + sum;
+                if (score < bestScore) {
+                    bestScore = score;
+                    bestDiscard = testDiscard;
+                    bestPartition = partition;
+                }
             }
         }
 
-        if (!canClose) {
-            // Devolver la carta a la mano
-            p.hand.push(c);
+        if (!bestDiscard) {
             return "No puedes cerrar. Necesitas tener máximo 2 cartas sin combinar y al menos una de ellas debe ser de valor 3 o menor.";
         }
 
-        return this.endRound(n, leftoversCount === 0, c);
+        // Realizar el cierre con la mejor carta encontrada
+        const i = p.hand.findIndex(c => c.id === bestDiscard.id);
+        const c = p.hand.splice(i, 1)[0];
+
+        return this.endRound(n, bestPartition.leftovers.length === 0, c);
     }
 
     endRound(w, ch, c) {
-        let r = `¡Ronda terminada! ${w} cerró.\n`;
+        const [val, suit] = c.id.split('_');
+        let r = `¡Ronda terminada! ${w} cerró tirando el ${val} de ${suit}.\n`;
         for (const p of this.players) {
             let pts = getBestPartition(p.hand).leftovers.reduce((s, x) => s + (x.value >= 10 ? 10 : x.value), 0);
             if (p.nick === w) pts = ch ? -10 : 0;
