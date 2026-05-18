@@ -300,6 +300,18 @@ class ChinchonBot {
                 this.send(c, g.start());
                 if (g.status === 'playing') { this.announce(c); this.hands(c); }
             }, JOIN_TIME_LIMIT);
+        } else if (t === '!stop') {
+            if (g.status === 'waiting' && !g.joinTimer) {
+                this.send(c, "No hay ninguna partida activa para detener.");
+                return;
+            }
+            if (g.joinTimer) {
+                clearTimeout(g.joinTimer);
+                g.joinTimer = null;
+            }
+            g.status = 'waiting';
+            g.players = [];
+            this.send(c, `Partida/Lobby detenido por ${u}. Escriban !jugar para iniciar otra.`);
         } else if (t === 'join') {
             this.send(c, g.addPlayer(u));
         } else if (t === 'jugar!') {
