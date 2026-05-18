@@ -35,6 +35,110 @@ function getDeckCardTag() {
     return `<img src="${IMAGE_BASE_URL}cartadecierre.png" class="chinchon-card" onclick="sendChannelMessage('robar')" style="cursor:pointer; width:60px; height:auto; margin:2px; border-radius:5px; vertical-align:middle;" title="Robar del Mazo">`;
 }
 
+// === HAND GROUPING & SORTING UTILITIES ===
+const CONSECUTIVE = [1, 2, 3, 4, 5, 6, 7, 10, 11, 12];
+
+function isEscalera(cards) {
+    if (cards.length < 3) return false;
+    const suit = cards[0].suit;
+    if (!cards.every(c => c.suit === suit)) return false;
+    const indices = cards.map(c => CONSECUTIVE.indexOf(c.value)).sort((a, b) => a - b);
+    if (indices.some(idx => idx === -1)) return false;
+    for (let i = 0; i < indices.length - 1; i++) {
+        if (indices[i + 1] !== indices[i] + 1) return false;
+    }
+    return true;
+}
+
+function isGrupo(cards) {
+    if (cards.length < 3 || cards.length > 4) return false;
+    const val = cards[0].value;
+    if (!cards.every(c => c.value === val)) return false;
+    const suits = cards.map(c => c.suit);
+    const uniqueSuits = new Set(suits);
+    return uniqueSuits.size === suits.length;
+}
+
+function getSubsets(arr) {
+    const res = [];
+    function helper(index, current) {
+        if (index === arr.length) {
+            if (current.length >= 3) {
+                res.push(current);
+            }
+            return;
+        }
+        helper(index + 1, [...current, arr[index]]);
+        helper(index + 1, current);
+    }
+    helper(0, []);
+    return res;
+}
+
+function getBestPartition(cards) {
+    const validCombos = [];
+    const subsets = getSubsets(cards);
+    for (const subset of subsets) {
+        if (isGrupo(subset) || isEscalera(subset)) {
+            validCombos.push(subset);
+        }
+    }
+
+    let bestLeftovers = [...cards];
+    let bestGroups = [];
+
+    function search(availableCards, currentGroups) {
+        const currentLeftovers = availableCards;
+        const currentScore = getScore(currentLeftovers);
+        const bestScore = getScore(bestLeftovers);
+
+        if (currentScore < bestScore) {
+            bestLeftovers = [...currentLeftovers];
+            bestGroups = [...currentGroups];
+        }
+
+        for (const combo of validCombos) {
+            if (combo.every(cc => availableCards.some(ac => ac.id === cc.id))) {
+                const nextAvailable = availableCards.filter(ac => !combo.some(cc => cc.id === ac.id));
+                search(nextAvailable, [...currentGroups, combo]);
+            }
+        }
+    }
+
+    function getScore(leftovers) {
+        const count = leftovers.length;
+        const sum = leftovers.reduce((s, c) => s + (c.value >= 10 ? 10 : c.value), 0);
+        return count * 1000 + sum;
+    }
+
+    search(cards, []);
+
+    return {
+        groups: bestGroups,
+        leftovers: bestLeftovers
+    };
+}
+
+function organizeHandCards(hand) {
+    const partition = getBestPartition(hand);
+    const sortedCards = [];
+
+    for (const group of partition.groups) {
+        if (isEscalera(group)) {
+            group.sort((a, b) => CONSECUTIVE.indexOf(a.value) - CONSECUTIVE.indexOf(b.value));
+        }
+        sortedCards.push(...group);
+    }
+
+    const sortedLeftovers = [...partition.leftovers].sort((a, b) => a.value - b.value);
+    sortedCards.push(...sortedLeftovers);
+
+    return {
+        cards: sortedCards,
+        partition: partition
+    };
+}
+
 // === CHINCHON GAME LOGIC ===
 class ChinchonGame {
     constructor(channel) {
@@ -115,16 +219,38 @@ class ChinchonGame {
         if (!p || p.nick !== n || this.phase !== 'discard') return "No es tu turno.";
         const i = p.hand.findIndex(c => c.id === id);
         if (i === -1) return "No tienes esa carta.";
+        
+        // Sacar la carta elegida para cerrar
         const c = p.hand.splice(i, 1)[0];
-        const pts = p.hand.reduce((s, x) => s + (x.value >= 10 ? 10 : x.value), 0);
-        if (pts > 10) { p.hand.push(c); return `Puntos (${pts}) altos para cerrar.`; }
-        return this.endRound(n, pts === 0, c);
+        
+        // Obtener la partición de las 7 cartas restantes
+        const partition = getBestPartition(p.hand);
+        const leftoversCount = partition.leftovers.length;
+
+        let canClose = false;
+        if (leftoversCount === 0 || leftoversCount === 1) {
+            canClose = true;
+        } else if (leftoversCount === 2) {
+            // Al menos una de las dos debe ser un 1, 2 o 3
+            const values = partition.leftovers.map(x => x.value);
+            if (values.some(v => v === 1 || v === 2 || v === 3)) {
+                canClose = true;
+            }
+        }
+
+        if (!canClose) {
+            // Devolver la carta a la mano
+            p.hand.push(c);
+            return "No puedes cerrar. Necesitas tener máximo 2 cartas sin combinar y al menos una de ellas debe ser de valor 3 o menor.";
+        }
+
+        return this.endRound(n, leftoversCount === 0, c);
     }
 
     endRound(w, ch, c) {
         let r = `¡Ronda terminada! ${w} cerró.\n`;
         for (const p of this.players) {
-            let pts = p.hand.reduce((s, x) => s + (x.value >= 10 ? 10 : x.value), 0);
+            let pts = getBestPartition(p.hand).leftovers.reduce((s, x) => s + (x.value >= 10 ? 10 : x.value), 0);
             if (p.nick === w) pts = ch ? -10 : 0;
             p.points += pts;
             r += `${p.nick}: +${pts} (Total: ${p.points})\n`;
@@ -225,9 +351,10 @@ class ChinchonBot {
             if (n === null && g.status === 'playing' && g.getCurrentPlayer().nick !== p.nick) {
                 continue;
             }
-            let cardsHtml = p.hand.map(x => getCardTag(x.id)).join('');
+            const organized = organizeHandCards(p.hand);
+            let cardsHtml = organized.cards.map(x => getCardTag(x.id)).join('');
             if (g.status === 'playing') {
-                cardsHtml += getCloseTag(p.hand[0].id);
+                cardsHtml += getCloseTag(organized.cards[0].id);
             }
             let h = `Tus cartas:<br><div class="chinchon-cards-container" style="display: flex; flex-flow: row wrap; gap: 4px; margin-top: 6px; align-items: center;">${cardsHtml}</div>`;
             this.notice(p.nick, h);
