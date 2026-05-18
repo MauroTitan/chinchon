@@ -139,6 +139,10 @@ function organizeHandCards(hand) {
     };
 }
 
+// === SUIT SYMBOLS & LEADERBOARD UTILITIES ===
+const SUIT_SYMBOLS = { oro: '◆', copa: '♡', espada: '♤', basto: '☘' };
+const CIRCLE_NUMBERS = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩'];
+
 // === CHINCHON GAME LOGIC ===
 class ChinchonGame {
     constructor(channel) {
@@ -149,6 +153,8 @@ class ChinchonGame {
         this.currentTurn = 0;
         this.phase = 'draw'; 
         this.status = 'waiting'; 
+        this.roundNumber = 0;
+        this.eliminatedPlayers = [];
     }
 
     initDeck() {
@@ -163,6 +169,16 @@ class ChinchonGame {
 
     start() {
         if (this.players.length < 2) return "Se necesitan al menos 2 jugadores.";
+        
+        // Si iniciamos una nueva partida
+        if (this.roundNumber === 0 || this.status === 'ended') {
+            this.roundNumber = 1;
+            this.eliminatedPlayers = [];
+            for (const p of this.players) p.points = 0;
+        } else {
+            this.roundNumber++;
+        }
+
         this.status = 'playing';
         this.initDeck();
         this.discardPile = [];
@@ -170,7 +186,7 @@ class ChinchonGame {
         this.discardPile.push(this.deck.pop());
         this.currentTurn = 0;
         this.phase = 'draw';
-        return "¡Juego iniciado! Cartas repartidas.";
+        return `¡Juego iniciado! Cartas repartidas para la **Ronda ${this.roundNumber}**.`;
     }
 
     addPlayer(n) {
@@ -208,7 +224,7 @@ class ChinchonGame {
         if (i === -1) return "No tienes esa carta.";
         const c = p.hand.splice(i, 1)[0];
         this.discardPile.push(c);
-        if (p.hand.length === 0) return this.endRound(n, true);
+        if (p.hand.length === 0) return this.endRound(n, true, c, false);
         this.currentTurn = (this.currentTurn + 1) % this.players.length;
         this.phase = 'draw';
         return c;
@@ -260,21 +276,98 @@ class ChinchonGame {
         const i = p.hand.findIndex(c => c.id === bestDiscard.id);
         const c = p.hand.splice(i, 1)[0];
 
-        return this.endRound(n, bestPartition.leftovers.length === 0, c);
+        // Verificar si todas las 7 cartas restantes son del mismo palo (Chinchón)
+        const remainingSuits = new Set(p.hand.map(x => x.suit));
+        const isChinchon = (bestPartition.leftovers.length === 0 && remainingSuits.size === 1);
+
+        return this.endRound(n, bestPartition.leftovers.length === 0, c, isChinchon);
     }
 
-    endRound(w, ch, c) {
+    endRound(w, ch, c, isChinchon) {
         const [val, suit] = c.id.split('_');
-        let r = `¡Ronda terminada! ${w} cerró tirando el ${val} de ${suit}.\n`;
+        let r = `⚡ **Ronda ${this.roundNumber}**\n\n`;
+        r += `¡Ronda terminada! **${w}** cerró tirando el ${val} de ${SUIT_SYMBOLS[suit] || suit}.\n\n`;
+        r += `**Puntuación de esta ronda:**\n`;
+        
+        // Calcular puntos de esta ronda para todos
+        const roundPts = {};
         for (const p of this.players) {
             let pts = getBestPartition(p.hand).leftovers.reduce((s, x) => s + (x.value >= 10 ? 10 : x.value), 0);
-            if (p.nick === w) pts = ch ? -10 : 0;
-            p.points += pts;
-            r += `${p.nick}: +${pts} (Total: ${p.points})\n`;
+            if (p.nick === w) {
+                pts = isChinchon ? -25 : (ch ? -10 : 0);
+            }
+            roundPts[p.nick] = pts;
         }
-        this.players = this.players.filter(p => p.points < 70);
-        if (this.players.length <= 1) { r += `Ganador: ${this.players[0] ? this.players[0].nick : 'Nadie'}`; this.status = 'ended'; }
-        else { this.status = 'waiting'; r += "Escriban !jugar para otra."; }
+
+        // Aplicar los puntos al total y mostrar detalle de cartas sobrantes
+        for (const p of this.players) {
+            const pts = roundPts[p.nick];
+            p.points += pts;
+            
+            const partition = getBestPartition(p.hand);
+            const leftoversText = partition.leftovers.map(x => `${x.value}${SUIT_SYMBOLS[x.suit] || x.suit}`).join(', ') || 'Ninguna (0)';
+            r += `• **${p.nick}**: +${pts} pts (Sobrantes: ${leftoversText}) - Total: ${p.points} pts\n`;
+        }
+
+        // Guardar eliminados de esta ronda y registrar
+        const eliminated = [];
+        const remainingPlayers = [];
+        for (const p of this.players) {
+            if (p.points >= 70) {
+                eliminated.push(p);
+                this.eliminatedPlayers.push({ nick: p.nick, points: p.points, roundEliminated: this.roundNumber });
+            } else {
+                remainingPlayers.push(p);
+            }
+        }
+
+        // Mensajes de eliminación dramáticos
+        for (const p of eliminated) {
+            r += `\n😂 'Hasta Luego' (+70 pts): 💀 **${p.nick}**: ${p.points} puntos\n`;
+        }
+
+        // Verificar si termina el juego (si queda <= 1 jugador o si hubo Chinchón)
+        const isGameOver = (remainingPlayers.length <= 1) || isChinchon;
+
+        if (isGameOver) {
+            this.status = 'ended';
+            
+            // Consolidar todos los jugadores para el ranking
+            const allEndedPlayers = [];
+            // Sobrevivientes
+            for (const p of remainingPlayers) {
+                allEndedPlayers.push({ nick: p.nick, points: p.points, survived: true, round: this.roundNumber });
+            }
+            // Eliminados en esta ronda
+            for (const p of eliminated) {
+                allEndedPlayers.push({ nick: p.nick, points: p.points, survived: false, round: this.roundNumber });
+            }
+            // Eliminados en rondas anteriores
+            for (const ep of this.eliminatedPlayers) {
+                if (!allEndedPlayers.some(x => x.nick === ep.nick)) {
+                    allEndedPlayers.push({ nick: ep.nick, points: ep.points, survived: false, round: ep.roundEliminated });
+                }
+            }
+
+            // Ordenar ranking
+            allEndedPlayers.sort((a, b) => {
+                if (a.survived !== b.survived) return a.survived ? -1 : 1;
+                if (a.round !== b.round) return b.round - a.round;
+                return a.points - b.points;
+            });
+
+            r += `\n🏆✨ **Ganador** ✨🏆\n`;
+            allEndedPlayers.forEach((p, idx) => {
+                const num = CIRCLE_NUMBERS[idx] || `[${idx + 1}]`;
+                r += `${num} **${p.nick}**: ${p.points} pts (${p.survived ? 'Sobreviviente' : 'Eliminado en Ronda ' + p.round})\n`;
+            });
+            r += `\nEl juego ha terminado. Escriban **!jugar** para iniciar una nueva partida.`;
+        } else {
+            this.status = 'waiting';
+            this.players = remainingPlayers; // Solo quedan los sobrevivientes para la siguiente ronda
+            r += `\nEscriban **!jugar** para iniciar la siguiente ronda.`;
+        }
+
         return r;
     }
 }
