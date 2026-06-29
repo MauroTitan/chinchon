@@ -180,17 +180,60 @@
                 const c = m.target.startsWith('#') ? m.target : u;
                 const g = this.getGame(c);
 
-                if (t === '!jugar') {
-                    if (g.status !== 'waiting') return;
-                    this.send(c, "Lobby abierto (30s). Pongan 'join'.");
+                if (t === '!ayuda') {
+                    const helpMsg = `<div style="font-family: sans-serif; background-color: #1e293b; border-left: 4px solid #38bdf8; padding: 12px; border-radius: 8px; color: #f1f5f9; line-height: 1.5; max-width: 500px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);">` +
+                        `<h3 style="margin-top: 0; color: #38bdf8; font-size: 16px; display: flex; align-items: center; gap: 6px;">🃏 Reglamento del Chinchón 🃏</h3>` +
+                        `<p style="margin: 6px 0; font-size: 13px;"><b>Objetivo:</b> Combinar tus 7 cartas en grupos de números iguales o escaleras del mismo palo (mínimo 3 cartas).</p>` +
+                        `<h4 style="margin: 8px 0 4px 0; color: #38bdf8; font-size: 14px;">🎮 Comandos de Juego:</h4>` +
+                        `<ul style="margin: 0; padding-left: 20px; font-size: 13px;">` +
+                        `<li><b>!jugar</b>: Abre el lobby o inicia la partida.</li>` +
+                        `<li><b>join</b>: Te une a una partida activa en el lobby.</li>` +
+                        `<li><b>!stop</b>: Cancela el lobby o detiene la partida en curso.</li>` +
+                        `<li><b>robar</b> (o clic en mazo): Toma una carta del mazo.</li>` +
+                        `<li><b>tomar</b> (o clic en mesa): Toma la carta visible de la mesa.</li>` +
+                        `<li><b>tirar [carta]</b> (o clic en tu carta): Descarta una carta de tu mano.</li>` +
+                        `<li><b>cerrar [carta]</b> (o clic en botón): Termina la ronda.</li>` +
+                        `</ul>` +
+                        `<h4 style="margin: 8px 0 4px 0; color: #38bdf8; font-size: 14px;">🚪 ¿Cómo cerrar?</h4>` +
+                        `<p style="margin: 6px 0; font-size: 13px;">Debes descartar 1 carta y tener en mano como máximo <b>2 cartas sin combinar</b> que sumen <b>3 puntos o menos</b> (ej: un 1 y un 2, o un 3 solo).</p>` +
+                        `<h4 style="margin: 8px 0 4px 0; color: #38bdf8; font-size: 14px;">🏆 Puntuación:</h4>` +
+                        `<ul style="margin: 0; padding-left: 20px; font-size: 13px;">` +
+                        `<li><b>Menos 10 pts (-10):</b> Cerrar con todas las cartas combinadas (0 sueltas).</li>` +
+                        `<li><b>Chinchón (-25):</b> Escalera de 7 cartas consecutivas del mismo palo (gana el juego).</li>` +
+                        `<li><b>Cartas sueltas:</b> Suman su valor. Las figuras (10, 11, 12) suman 10, 11 y 12 pts respectivamente.</li>` +
+                        `<li>Si sumas <b>70 puntos o más</b> quedas eliminado. ¡Último en pie gana!</li>` +
+                        `</ul>` +
+                        `</div>`;
+                    this.send(c, helpMsg);
+                } else if (t === '!jugar') {
+                    if (g.status === 'ended') {
+                        g.status = 'waiting';
+                        g.players = [];
+                        g.roundNumber = 0;
+                    }
+                    if (g.status !== 'waiting') {
+                        this.send(c, "Ya hay una partida en curso.");
+                        return;
+                    }
+                    this.send(c, "Lobby abierto (30s). Pongan 'join'. Escribe !ayuda para ver las reglas y comandos.");
                     g.joinTimer = setTimeout(() => {
+                        g.joinTimer = null;
                         this.send(c, g.start());
                         if (g.status === 'playing') { this.announce(c); this.hands(c); }
                     }, JOIN_TIME_LIMIT);
                 } else if (t === 'join') {
+                    if (!g.joinTimer) {
+                        this.send(c, "No hay ningún lobby activo para unirse. Escribe !jugar para iniciar uno.");
+                        return;
+                    }
                     this.send(c, g.addPlayer(u));
                 } else if (t === 'jugar!') {
+                    if (!g.joinTimer) {
+                        this.send(c, "No hay ningún lobby activo para iniciar. Escribe !jugar primero.");
+                        return;
+                    }
                     if (g.joinTimer) clearTimeout(g.joinTimer);
+                    g.joinTimer = null;
                     this.send(c, g.start());
                     if (g.status === 'playing') { this.announce(c); this.hands(c); }
                 } else if (t === 'tomar') {

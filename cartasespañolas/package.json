@@ -1,4 +1,10 @@
 {
+  "name": "chinchon-bot",
+  "version": "1.0.0",
+  "main": "chinchon_bot.js",
+  "scripts": {
+    "start": "node chinchon_bot.js"
+  },
   "dependencies": {
     "ws": "^8.20.0"
   }
